@@ -28,6 +28,8 @@ module.exports = async function handler(req, res) {
       expand: ["data.items.data.price"]
     });
 
+    console.log("👀 Subscriptions returned by Stripe:", subscriptions.data); // ⬅️ Add this
+    
     const validPriceIds = [
       "price_1RCWrsKcBIwVNUGjVanTTXxl" // ← ⬅️ Replace with your Tier 2 Price ID from Stripe to match
     ];
