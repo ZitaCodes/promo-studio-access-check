@@ -2,6 +2,10 @@
 import Stripe from "stripe";
 console.log("🔥 STRIPE KEY USED:", process.env.STRIPE_SECRET_KEY);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+console.log("🧾 Customer Subscriptions:", subscriptions.data.map(sub =>
+  sub.items.data.map(item => item.price.id)
+));
+
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
