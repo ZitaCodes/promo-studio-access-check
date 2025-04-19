@@ -9,7 +9,7 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-const TIER_2_PRODUCT_ID = "prod_S6kMEev0H9XhAq"; // ✅ Tier 2 product ID from Stripe
+const TIER_2_PRODUCT_ID = "prod_S6kMEev0H9XhAq"; // ✅ Tier 2 product ID from Stripe to match
 
 app.post("/api/check-subscription", async (req, res) => {
   const { email } = req.body;
