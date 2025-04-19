@@ -30,10 +30,14 @@ app.post("/api/check-subscription", async (req, res) => {
       expand: ["data.default_payment_method"]
     });
 
-    const hasTier2 = subscriptions.data.some(sub =>
-  ["active", "trialing"].includes(sub.status) &&
-  sub.items.data.some(item => VALID_PRICE_IDS.includes(item.price.id))
-);
+   const hasTier2 = subscriptions.data.some(sub => {
+  console.log("🔍 Subscription Status:", sub.status);
+  return (
+    sub.status === "active" &&
+    sub.items.data.some(item => item.price.id === TIER_2_PRICE_ID)
+  );
+});
+
 
     return res.json({ access: hasTier2 });
 
