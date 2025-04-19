@@ -1,10 +1,9 @@
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const Stripe = require("stripe"); // ✅ Add this line
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const Stripe = require("stripe"); // ✅ required to use Stripe constructor
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY); // ✅ dynamic key
 console.log("🧪 Stripe Key Render Sees:", process.env.STRIPE_SECRET_KEY);
-
 
 const app = express();
 app.use(cors());
