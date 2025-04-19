@@ -39,5 +39,3 @@ app.post("/api/check-subscription", async (req, res) => {
     return res.status(500).json({ access: false });
   }
 });
-${PORT}`);
-});
