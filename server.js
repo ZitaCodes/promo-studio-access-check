@@ -34,23 +34,19 @@ const subscriptions = await stripe.subscriptions.list({
 console.log("📦 Subscriptions Found:", subscriptions.data);
 
 console.log("🔍 SUBSCRIPTION DEBUG:");
-subscriptions.data.forEach(sub => {
+subscriptions.data.forEach((sub, index) => {
+  console.log(`🧾 Subscription [${index + 1}] ID:`, sub.id);
   console.log("➡️ Status:", sub.status);
-  sub.items.data.forEach(item => {
-    console.log("   - Price ID:", item.price.id);
-  });
+  console.log("➡️ Cancel At:", sub.cancel_at);
+  console.log("➡️ Current Period End:", sub.current_period_end);
+  console.log("➡️ Price ID(s):", sub.items.data.map(item => item.price.id));
 });
 
-
-      
-const hasTier2 = subscriptions.data.some(sub => {
-  console.log("🔍 Subscription Status:", sub.status);
-  return (
-    sub.status === "active" &&
-    sub.items.data.some(item => item.price.id === TIER_2_PRICE_ID)
-  );
+const hasTier2 = subscriptions.data.some(sub =>
+  (sub.status === "active" || sub.status === "trialing") &&
+  sub.items.data.some(item => item.price.id === TIER_2_PRICE_ID)
+);
 });
-
 
 
     return res.json({ access: hasTier2 });
