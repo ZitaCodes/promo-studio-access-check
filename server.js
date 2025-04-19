@@ -39,10 +39,11 @@ app.post("/api/check-subscription", async (req, res) => {
       console.log("➡️ Price ID(s):", sub.items.data.map(item => item.price.id));
     });
 
-    const hasTier2 = subscriptions.data.some(sub =>
-      (sub.status === "active" || sub.status === "trialing") &&
-      sub.items.data.some(item => item.price.id === TIER_2_PRICE_ID)
-    );
+    const hasTier2 = subscriptions.data.some(sub => {
+  console.log("📌 Found Sub Status:", sub.status); // 🐞 debug line
+  return sub.items.data.some(item => item.price.id === VALID_PRICE_IDS[0]);
+});
+
 
     return res.json({ access: hasTier2 });
 
