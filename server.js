@@ -33,6 +33,16 @@ const subscriptions = await stripe.subscriptions.list({
 
 console.log("📦 Subscriptions Found:", subscriptions.data);
 
+console.log("🔍 SUBSCRIPTION DEBUG:");
+subscriptions.data.forEach(sub => {
+  console.log("➡️ Status:", sub.status);
+  sub.items.data.forEach(item => {
+    console.log("   - Price ID:", item.price.id);
+  });
+});
+
+
+      
 const hasTier2 = subscriptions.data.some(sub => {
   console.log("🔍 Subscription Status:", sub.status);
   return (
