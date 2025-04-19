@@ -1,8 +1,10 @@
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY); // ✅ using Render env var
+const Stripe = require("stripe"); // ✅ Add this line
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 console.log("🧪 Stripe Key Render Sees:", process.env.STRIPE_SECRET_KEY);
+
 
 const app = express();
 app.use(cors());
