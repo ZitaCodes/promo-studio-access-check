@@ -17,26 +17,29 @@ app.post("/api/check-subscription", async (req, res) => {
   const { email } = req.body;
 
     try {
-    const customers = await stripe.customers.list({ email });
-    const customer = customers.data[0];
+   const customers = await stripe.customers.list({ email });
+console.log("📬 Stripe Customer Found:", customers.data);
 
-    if (!customer) {
-      return res.json({ access: false });
-    }
+const customer = customers.data[0];
+if (!customer) {
+  return res.json({ access: false });
+}
 
-    const subscriptions = await stripe.subscriptions.list({
-      customer: customer.id,
-      status: "all",
-      expand: ["data.default_payment_method"]
-    });
+const subscriptions = await stripe.subscriptions.list({
+  customer: customer.id,
+  status: "all",
+  expand: ["data.items.data.price.product"]
+});
+console.log("📦 Subscriptions Found:", subscriptions.data);
 
-   const hasTier2 = subscriptions.data.some(sub => {
+const hasTier2 = subscriptions.data.some(sub => {
   console.log("🔍 Subscription Status:", sub.status);
   return (
     sub.status === "active" &&
     sub.items.data.some(item => item.price.id === TIER_2_PRICE_ID)
   );
 });
+
 
 
     return res.json({ access: hasTier2 });
