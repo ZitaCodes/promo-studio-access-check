@@ -9,7 +9,9 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-const TIER_2_PRODUCT_ID = "prod_S6kMEev0H9XhAq"; // ✅ Tier 2 product ID from Stripe to match
+const VALID_PRICE_IDS = [
+  "price_1RCWrsKcBIwVNUGjVanTTXxl" // ⬅️ Replace with your Tier 2 Price ID from Stripe
+];
 
 app.post("/api/check-subscription", async (req, res) => {
   const { email } = req.body;
@@ -29,9 +31,9 @@ app.post("/api/check-subscription", async (req, res) => {
     });
 
     const hasTier2 = subscriptions.data.some(sub =>
-      sub.status === "active" &&
-      sub.items.data.some(item => item.price.product === TIER_2_PRODUCT_ID)
-    );
+  ["active", "trialing"].includes(sub.status) &&
+  sub.items.data.some(item => VALID_PRICE_IDS.includes(item.price.id))
+);
 
     return res.json({ access: hasTier2 });
 
