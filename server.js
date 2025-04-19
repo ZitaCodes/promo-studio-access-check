@@ -42,4 +42,7 @@ app.post("/api/check-subscription", async (req, res) => {
     return res.status(500).json({ access: false });
   }
 });
-  
+
+app.listen(10000, () => {
+  console.log("✅ Your service is live 🎉");
+});
