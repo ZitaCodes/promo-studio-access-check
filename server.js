@@ -14,7 +14,7 @@ const TIER_2_PRODUCT_ID = "prod_S6kMEev0H9XhAq"; // ✅ Tier 2 product ID from S
 app.post("/api/check-subscription", async (req, res) => {
   const { email } = req.body;
 
-  try {
+    try {
     const customers = await stripe.customers.list({ email });
     const customer = customers.data[0];
 
@@ -40,3 +40,4 @@ app.post("/api/check-subscription", async (req, res) => {
     return res.status(500).json({ access: false });
   }
 });
+  
