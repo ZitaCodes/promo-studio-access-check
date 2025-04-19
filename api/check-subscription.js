@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
       status: "all",
-      expand: ["data.items.data.price.price"]
+      expand: ["data.items.data.price"]
     });
 
     const validPriceIds = [
