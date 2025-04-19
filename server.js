@@ -28,8 +28,9 @@ if (!customer) {
 const subscriptions = await stripe.subscriptions.list({
   customer: customer.id,
   status: "all",
-  expand: ["data.items.data.price.product"]
+  expand: ["data.items.data.price"]
 });
+
 console.log("📦 Subscriptions Found:", subscriptions.data);
 
 const hasTier2 = subscriptions.data.some(sub => {
