@@ -37,7 +37,8 @@ app.post("/api/check-subscription", async (req, res) => {
       console.log("➡️ Current Period End:", sub.current_period_end);
       
       // Add this line to inspect what's inside sub.items
-      console.log("🧾 Item Dump:", sub.items);      
+      console.log("🧾 Item Dump:", sub.items);  
+      console.log("📏 Number of Items:", sub.items.data.length);
       sub.items.data.forEach((item, i) => {
   console.log(`   ↪︎ Item ${i + 1} ID:`, item.id);
   console.log(`   ↪︎ Item Price ID:`, item.price.id);
