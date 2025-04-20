@@ -10,6 +10,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 const VALID_PRICE_IDS = ["price_1RCWrsKcBIwVNUGjVanTTXxl"]; // ✅ Confirmed Price ID
+
 app.post("/api/check-subscription", async (req, res) => {
   const { email } = req.body;
 
@@ -22,48 +23,38 @@ app.post("/api/check-subscription", async (req, res) => {
       return res.json({ access: false });
     }
 
-   console.log("🧵 BEGINNING STRIPE DEBUG DUMP");
-console.log("➡️ Customer ID:", customer.id);
+    console.log("🧵 BEGINNING STRIPE DEBUG DUMP");
+    console.log("➡️ Customer ID:", customer.id);
 
-const stripeSubs = await stripe.subscriptions.list({
-  customer: customer.id,
-  status: "all",
-  expand: ["data.items", "data.items.data.price"]
-});
-
-console.log("🧾 Raw Subscriptions Response:", JSON.stringify(stripeSubs, null, 2));
-
-const allPrices = stripeSubs.data.flatMap(sub =>
-  sub.items.data.map(item => item.price.id)
-);
-
-console.log("💲 Extracted Price IDs:", allPrices);
-console.log("✅ VALID_PRICE_IDS Check:", VALID_PRICE_IDS);
-
-const hasMatch = stripeSubs.data.some(sub =>
-  sub.status === "active" &&
-  sub.items.data.some(item => item.price.id === VALID_PRICE_IDS[0])
-);
-
-console.log("🎯 Access Match Found:", hasMatch);
-return res.json({ access: hasMatch });
-
-    
+    const stripeSubs = await stripe.subscriptions.list({
+      customer: customer.id,
+      status: "all",
+      expand: ["data.items", "data.items.data.price"]
     });
 
-    const hasTier2 = subscriptions.data.some(sub => {
-  console.log("📌 Found Sub Status:", sub.status); // 🐞 debug line
-  return sub.items.data.some(item => VALID_PRICE_IDS.includes(item.price.id));
-});
+    console.log("🧾 Raw Subscriptions Response:", JSON.stringify(stripeSubs, null, 2));
 
+    const allPrices = stripeSubs.data.flatMap(sub =>
+      sub.items.data.map(item => item.price.id)
+    );
 
-    return res.json({ access: hasTier2 });
+    console.log("💲 Extracted Price IDs:", allPrices);
+    console.log("✅ VALID_PRICE_IDS Check:", VALID_PRICE_IDS);
+
+    const hasMatch = stripeSubs.data.some(sub =>
+      sub.status === "active" &&
+      sub.items.data.some(item => item.price.id === VALID_PRICE_IDS[0])
+    );
+
+    console.log("🎯 Access Match Found:", hasMatch);
+    return res.json({ access: hasMatch });
 
   } catch (err) {
     console.error("❌ Stripe Error:", err.message);
     return res.status(500).json({ access: false });
   }
 });
+  
 
 app.listen(10000, () => {
   console.log("✅ Your service is live 🎉");
