@@ -22,27 +22,32 @@ app.post("/api/check-subscription", async (req, res) => {
       return res.json({ access: false });
     }
 
-    const subscriptions = await stripe.subscriptions.list({
-      customer: customer.id,
-      status: "all",
-      expand: ["data.items"]
-    });
+   console.log("🧵 BEGINNING STRIPE DEBUG DUMP");
+console.log("➡️ Customer ID:", customer.id);
 
-        console.log("📦 Subscriptions Found:", subscriptions.data);
-    console.log("🔍 SUBSCRIPTION DEBUG:");
-    subscriptions.data.forEach((sub, index) => {
-      console.log(`🧾 Subscription [${index + 1}] ID:`, sub.id);
-      console.log("➡️ Status:", sub.status);
-      console.log("➡️ Cancel At:", sub.cancel_at);
-      console.log("➡️ Current Period End:", sub.current_period_end);
-      
-      // Add this line to inspect what's inside sub.items
-      console.log("🧾 Item Dump:", sub.items);  
-      console.log("📏 Number of Items:", sub.items.data.length);
-      sub.items.data.forEach((item, i) => {
-  console.log(`   ↪︎ Item ${i + 1} ID:`, item.id);
-  console.log(`   ↪︎ Item Price ID:`, item.price.id);
+const stripeSubs = await stripe.subscriptions.list({
+  customer: customer.id,
+  status: "all",
+  expand: ["data.items", "data.items.data.price"]
 });
+
+console.log("🧾 Raw Subscriptions Response:", JSON.stringify(stripeSubs, null, 2));
+
+const allPrices = stripeSubs.data.flatMap(sub =>
+  sub.items.data.map(item => item.price.id)
+);
+
+console.log("💲 Extracted Price IDs:", allPrices);
+console.log("✅ VALID_PRICE_IDS Check:", VALID_PRICE_IDS);
+
+const hasMatch = stripeSubs.data.some(sub =>
+  sub.status === "active" &&
+  sub.items.data.some(item => item.price.id === VALID_PRICE_IDS[0])
+);
+
+console.log("🎯 Access Match Found:", hasMatch);
+return res.json({ access: hasMatch });
+
     
     });
 
