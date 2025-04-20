@@ -9,7 +9,7 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-const VALID_PRICE_IDS = ["price_1RCWrsKcBIwVNUGjVanTTXxL"]; // ✅ Confirmed Price ID
+const VALID_PRICE_IDS = ["price_1RCWrsKcBIwVNUGjVanTTXxl"]; // ✅ Confirmed Price ID
 app.post("/api/check-subscription", async (req, res) => {
   const { email } = req.body;
 
