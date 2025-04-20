@@ -25,18 +25,24 @@ app.post("/api/check-subscription", async (req, res) => {
     const subscriptions = await stripe.subscriptions.list({
       customer: customer.id,
       status: "all",
-      expand: ["data.items.data.price"]
+      expand: ["data.items"]
     });
 
-    
-    console.log("📦 Subscriptions Found:", subscriptions.data);
+        console.log("📦 Subscriptions Found:", subscriptions.data);
     console.log("🔍 SUBSCRIPTION DEBUG:");
     subscriptions.data.forEach((sub, index) => {
       console.log(`🧾 Subscription [${index + 1}] ID:`, sub.id);
       console.log("➡️ Status:", sub.status);
       console.log("➡️ Cancel At:", sub.cancel_at);
       console.log("➡️ Current Period End:", sub.current_period_end);
-      console.log("➡️ Price ID(s):", sub.items.data.map(item => item.price.id));
+      
+      // Add this line to inspect what's inside sub.items
+      console.log("🧾 Item Dump:", sub.items);      
+      sub.items.data.forEach((item, i) => {
+  console.log(`   ↪︎ Item ${i + 1} ID:`, item.id);
+  console.log(`   ↪︎ Item Price ID:`, item.price.id);
+});
+    
     });
 
     const hasTier2 = subscriptions.data.some(sub => {
