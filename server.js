@@ -9,8 +9,7 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-const TIER_2_PRICE_ID = "price_1RCWrsKcBIwVNUGjVanTTXxl"; // ✅ Confirmed Price ID
-
+const VALID_PRICE_IDS = ["price_1RCWrsKcBIwVNUGjVanTTXxL"]; // ✅ Confirmed Price ID
 app.post("/api/check-subscription", async (req, res) => {
   const { email } = req.body;
 
@@ -29,6 +28,7 @@ app.post("/api/check-subscription", async (req, res) => {
       expand: ["data.items.data.price"]
     });
 
+    
     console.log("📦 Subscriptions Found:", subscriptions.data);
     console.log("🔍 SUBSCRIPTION DEBUG:");
     subscriptions.data.forEach((sub, index) => {
@@ -41,7 +41,7 @@ app.post("/api/check-subscription", async (req, res) => {
 
     const hasTier2 = subscriptions.data.some(sub => {
   console.log("📌 Found Sub Status:", sub.status); // 🐞 debug line
-  return sub.items.data.some(item => item.price.id === VALID_PRICE_IDS[0]);
+  return sub.items.data.some(item => VALID_PRICE_IDS.includes(item.price.id));
 });
 
 
