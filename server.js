@@ -6,7 +6,20 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 console.log("🧪 Stripe Key Render Sees:", process.env.STRIPE_SECRET_KEY);
 
 const app = express();
-app.use(cors());
+
+// ✅ CORS config to allow Vercel domain
+const allowedOrigins = ["https://bookmkttool.vercel.app"];  // Add other domains if needed
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error("CORS not allowed from this origin"), false);
+  },
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type"]
+}));
+
 app.use(bodyParser.json());
 
 const VALID_PRICE_IDS = ["price_1RCWrsKcBIwVNUGjVanTTXxl"]; // ✅ Confirmed Price ID
@@ -54,9 +67,7 @@ app.post("/api/check-subscription", async (req, res) => {
     return res.status(500).json({ access: false });
   }
 });
-  
 
 app.listen(10000, () => {
   console.log("✅ Your service is live 🎉");
 });
-
