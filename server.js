@@ -11,19 +11,19 @@ console.log("🧪 Stripe Key Render Sees:", process.env.STRIPE_SECRET_KEY);
 const app = express();
 
 // ✅ MongoDB Setup
-const mongoURI = process.env.MONGODB_URI;
-mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch(err => console.error("❌ MongoDB connection error:", err));
+// const mongoURI = process.env.MONGODB_URI;
+//mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
+//  .then(() => console.log("✅ MongoDB connected"))
+//  .catch(err => console.error("❌ MongoDB connection error:", err));
 
-const pullSchema = new mongoose.Schema({
-  email: { type: String, required: true, unique: true },
-  pulls_used: { type: Number, default: 0 },
-  pull_limit: { type: Number, default: 26 },
-  last_reset: { type: Date, default: new Date() }
-});
+//const pullSchema = new mongoose.Schema({
+//  email: { type: String, required: true, unique: true },
+//  pulls_used: { type: Number, default: 0 },
+//  pull_limit: { type: Number, default: 26 },
+//  last_reset: { type: Date, default: new Date() }
+//});
 
-const Pull = mongoose.model("Pull", pullSchema);
+//const Pull = mongoose.model("Pull", pullSchema);
 
 // ✅ CORS config to allow Vercel domain
 const allowedOrigins = ["https://bookmkttool.vercel.app"];
