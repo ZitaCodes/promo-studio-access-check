@@ -6,7 +6,7 @@ const stripe = STRIPE_KEY?.startsWith("sk_") ? new Stripe(STRIPE_KEY) : null;
 
 // ADD **ALL** price IDs that should grant access
 const VALID_PRICE_IDS = [
-  "price_1RCWrsKcBIwVNUGjVanTTXxl", // <-- your pasted Tier 2
+  "price_1RCWrsKcBIwVNUGjVanTTXxl", // <-- your pasted Tier 2 
   // "price_XXXXXXXXXXXX",          // <-- add your $3.99 / any other plan here
 ];
 
