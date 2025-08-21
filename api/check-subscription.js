@@ -1,21 +1,19 @@
-// Ensure Node runtime (Stripe needs Node, not Edge)
-export const config = { runtime: "nodejs" };
-
-import Stripe from "stripe";
+// api/check-subscription.js  (Vercel Node Serverless Function, CommonJS)
+const Stripe = require("stripe");
 
 const STRIPE_KEY = process.env.STRIPE_SECRET_KEY || "";
 const stripe = STRIPE_KEY.startsWith("sk_") ? new Stripe(STRIPE_KEY) : null;
 
-// ✅ Add ALL live price ids that should unlock access
+// ✅ Add EVERY live price_… that should unlock access
 const VALID_PRICE_IDS = [
   "price_1RCWrsKcBIwVNUGjVanTTXxl",
   // "price_xxxxxxxxxxxxxxxxxxxxx", // add other tiers here if you sell them
 ];
 
-// ✅ Which subscription statuses are allowed
-const OK = new Set(["active", "trialing"]); // add "past_due","incomplete" if you want grace access
+// ✅ Which statuses are allowed (extend if you want a grace period)
+const OK = new Set(["active", "trialing"]); // add "past_due","incomplete" if desired
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "method_not_allowed" });
   }
@@ -23,57 +21,54 @@ export default async function handler(req, res) {
   try {
     if (!stripe) {
       console.error("check-subscription: STRIPE_SECRET_KEY missing/invalid");
-      // Do not 500 the UI — return access:false so the page can show the resubscribe path
       return res.status(200).json({ access: false, error: "stripe_key_missing" });
     }
 
-    // 🔒 Normalize body (handles string / undefined safely)
-    const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+    // Normalize body (Vercel can send string/undefined)
+    const body =
+      typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
     const email = (body.email || "").trim().toLowerCase();
     const debug = !!body.debug;
-
     if (!email) return res.status(200).json({ access: false, error: "email_required" });
 
-    // 1) Lookup customer by email
-    const { data: customers } = await stripe.customers.list({ email, limit: 1 });
-    if (!customers?.length) {
-      return res.status(200).json({
-        access: false,
-        ...(debug ? { debug: { reason: "no_customer" } } : {})
-      });
+    // 1) Lookup customer
+    const customers = await stripe.customers.list({ email, limit: 1 });
+    if (!customers.data.length) {
+      return res
+        .status(200)
+        .json({ access: false, ...(debug ? { debug: { reason: "no_customer" } } : {}) });
     }
 
-    const customerId = customers[0].id;
-
-    // 2) Fetch all subs for this customer
+    // 2) Get subs
     const subs = await stripe.subscriptions.list({
-      customer: customerId,
+      customer: customers.data[0].id,
       status: "all",
       expand: ["data.items.data.price.product"],
-      limit: 100
+      limit: 100,
     });
 
     // 3) Decide access
     const access = subs.data.some(
-      (sub) =>
-        OK.has(sub.status) &&
-        sub.items.data.some((it) => VALID_PRICE_IDS.includes(it.price.id))
+      (s) =>
+        OK.has(s.status) &&
+        s.items.data.some((it) => VALID_PRICE_IDS.includes(it.price.id))
     );
 
-    // Minimal debug (only when debug:true sent)
+    const resp = { access };
     if (debug) {
-      const snapshot = subs.data.map((s) => ({
-        id: s.id,
-        status: s.status,
-        prices: s.items.data.map((i) => i.price.id)
-      }));
-      return res.status(200).json({ access, debug: { customerId, subs: snapshot, validPriceIds: VALID_PRICE_IDS } });
+      resp.debug = {
+        subs: subs.data.map((s) => ({
+          id: s.id,
+          status: s.status,
+          prices: s.items.data.map((i) => i.price.id),
+        })),
+        validPriceIds: VALID_PRICE_IDS,
+      };
     }
-
-    return res.status(200).json({ access });
+    return res.status(200).json(resp);
   } catch (err) {
-    // Log detail for Vercel Logs, but never 500 the UI
-    console.error("check-subscription error:", err?.type, err?.code, err?.message);
+    console.error("check-subscription error:", err && (err.stack || err.message || err));
+    // Never 500 the UI
     return res.status(200).json({ access: false, error: "server_error" });
   }
-}
+};
