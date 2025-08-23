@@ -1,76 +1,81 @@
-// api/check-subscription.js  (Vercel Node Serverless Function)
+// server.js — promo-studio-access-check (Render)
+const express = require("express");
+const cors = require("cors");
 const Stripe = require("stripe");
 
+const app = express();
+
+// --- CORS: allow your front-ends ---
+const corsOptions = {
+  origin(origin, cb) {
+    if (!origin) return cb(null, true); // server-to-server / curl
+    try {
+      const { hostname } = new URL(origin);
+      const allowed =
+        hostname.endsWith(".vercel.app") ||
+        hostname === "cloutbooks.com" ||
+        hostname === "www.cloutbooks.com" ||
+        hostname === "localhost"; // keep for local dev if you want
+      return cb(allowed ? null : new Error("CORS not allowed"), allowed);
+    } catch {
+      return cb(new Error("CORS origin parse error"), false);
+    }
+  },
+  methods: ["POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type"],
+  optionsSuccessStatus: 204,
+  maxAge: 86400
+};
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));            // ✅ every preflight gets 204
+
+// If you have any redirect middleware (force-https, etc.), guard OPTIONS:
+// app.use((req,res,next)=> req.method==="OPTIONS" ? res.sendStatus(204) : next());
+
+app.use(express.json());
+
+// --- Stripe ---
 const STRIPE_KEY = process.env.STRIPE_SECRET_KEY || "";
 const stripe = STRIPE_KEY.startsWith("sk_") ? new Stripe(STRIPE_KEY) : null;
 
-// ✅ ADD EVERY live price_... that grants access
+// Add ALL price IDs that should grant access
 const VALID_PRICE_IDS = [
   "price_1RCWrsKcBIwVNUGjVanTTXxl",
-  // "price_xxxxxxxxxxxxxxxxxxxxx", // add other tiers here if you sell them
+  // "price_... (add other tiers if you sell them)"
 ];
 
-// ✅ Allowed subscription statuses
-const OK = new Set(["active", "trialing"]); // add "past_due","incomplete" if you want grace access
+// Allow statuses you consider valid
+const OK = new Set(["active", "trialing"]); // add "past_due","incomplete" if you want grace
 
-module.exports = async (req, res) => {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "method_not_allowed" });
-  }
-
+app.post("/api/check-subscription", async (req, res) => {
   try {
-    if (!stripe) {
-      console.error("check-subscription: STRIPE_SECRET_KEY missing/invalid");
-      // Do not 500 the UI
-      return res.status(200).json({ access: false, error: "stripe_key_missing" });
-    }
+    if (!stripe) return res.status(200).json({ access:false, error:"stripe_key_missing" });
 
-    // Normalize body (Vercel can give string/undefined)
-    const body =
-      typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+    const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
     const email = (body.email || "").trim().toLowerCase();
-    const debug = !!body.debug;
+    if (!email) return res.status(200).json({ access:false, error:"email_required" });
 
-    if (!email) return res.status(200).json({ access: false, error: "email_required" });
+    const { data: customers } = await stripe.customers.list({ email, limit: 1 });
+    if (!customers?.length) return res.status(200).json({ access:false });
 
-    // 1) Lookup customer
-    const customers = await stripe.customers.list({ email, limit: 1 });
-    if (!customers.data.length) {
-      return res.status(200).json({
-        access: false,
-        ...(debug ? { debug: { reason: "no_customer" } } : {})
-      });
-    }
-
-    // 2) Get subscriptions
     const subs = await stripe.subscriptions.list({
-      customer: customers.data[0].id,
+      customer: customers[0].id,
       status: "all",
       expand: ["data.items.data.price.product"],
       limit: 100
     });
 
-    // 3) Decide access
     const access = subs.data.some(
-      s => OK.has(s.status) &&
-           s.items.data.some(it => VALID_PRICE_IDS.includes(it.price.id))
+      s => OK.has(s.status) && s.items.data.some(i => VALID_PRICE_IDS.includes(i.price.id))
     );
 
-    const resp = { access };
-    if (debug) {
-      resp.debug = {
-        subs: subs.data.map(s => ({
-          id: s.id,
-          status: s.status,
-          prices: s.items.data.map(i => i.price.id)
-        })),
-        validPriceIds: VALID_PRICE_IDS
-      };
-    }
-    return res.status(200).json(resp);
-  } catch (err) {
-    console.error("check-subscription error:", err && (err.stack || err.message || err));
-    // Never throw a 500 to the browser
-    return res.status(200).json({ access: false, error: "server_error" });
+    return res.status(200).json({ access });
+  } catch (e) {
+    console.error("check-subscription error:", e?.message || e);
+    // never 500 the browser
+    return res.status(200).json({ access:false, error:"server_error" });
   }
-};
+});
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log("Access check server listening on", PORT));
