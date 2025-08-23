@@ -1,76 +1,70 @@
-// api/check-subscription.js  (Vercel Node Serverless Function)
+// /api/check-subscription.js  — used by Render server.js (Express)
 const Stripe = require("stripe");
 
+// Log key presence only (avoid printing the full secret)
 const STRIPE_KEY = process.env.STRIPE_SECRET_KEY || "";
+console.log("🔥 Stripe key present:", STRIPE_KEY.startsWith("sk_"));
+
 const stripe = STRIPE_KEY.startsWith("sk_") ? new Stripe(STRIPE_KEY) : null;
 
-// ✅ ADD EVERY live price_... that grants access
-const VALID_PRICE_IDS = [
-  "price_1RCWrsKcBIwVNUGjVanTTXxl",
-  // "price_xxxxxxxxxxxxxxxxxxxxx", // add other tiers here if you sell them
-];
-
-// ✅ Allowed subscription statuses
-const OK = new Set(["active", "trialing"]); // add "past_due","incomplete" if you want grace access
-
-module.exports = async (req, res) => {
+module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "method_not_allowed" });
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
     if (!stripe) {
-      console.error("check-subscription: STRIPE_SECRET_KEY missing/invalid");
-      // Do not 500 the UI
+      console.error("Stripe key missing/invalid");
+      // Don't 500 the UI — just deny access
       return res.status(200).json({ access: false, error: "stripe_key_missing" });
     }
 
-    // Normalize body (Vercel can give string/undefined)
+    // Be defensive: handle string/undefined bodies gracefully
     const body =
       typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+
     const email = (body.email || "").trim().toLowerCase();
-    const debug = !!body.debug;
-
-    if (!email) return res.status(200).json({ access: false, error: "email_required" });
-
-    // 1) Lookup customer
-    const customers = await stripe.customers.list({ email, limit: 1 });
-    if (!customers.data.length) {
-      return res.status(200).json({
-        access: false,
-        ...(debug ? { debug: { reason: "no_customer" } } : {})
-      });
+    if (!email) {
+      return res.status(200).json({ access: false, error: "email_required" });
     }
 
-    // 2) Get subscriptions
-    const subs = await stripe.subscriptions.list({
-      customer: customers.data[0].id,
+    // 1) Find customer
+    const customers = await stripe.customers.list({ email, limit: 1 });
+    if (!customers.data.length) {
+      return res.status(200).json({ access: false });
+    }
+
+    const customerId = customers.data[0].id;
+
+    // 2) Get subs
+    const subscriptions = await stripe.subscriptions.list({
+      customer: customerId,
       status: "all",
+      // Your original expand was "price"; keeping product is fine too
       expand: ["data.items.data.price.product"],
       limit: 100
     });
 
-    // 3) Decide access
-    const access = subs.data.some(
-      s => OK.has(s.status) &&
-           s.items.data.some(it => VALID_PRICE_IDS.includes(it.price.id))
+    console.log("👀 Stripe subs:", subscriptions.data.map(s => ({
+      id: s.id,
+      status: s.status,
+      prices: s.items.data.map(i => i.price.id)
+    })));
+
+    // 3) Decide access (add any other price_... you sell)
+    const validPriceIds = [
+      "price_1RCWrsKcBIwVNUGjVanTTXxl"
+    ];
+
+    const hasValidSubscription = subscriptions.data.some(sub =>
+      (sub.status === "active" || sub.status === "trialing") &&
+      sub.items.data.some(item => validPriceIds.includes(item.price.id))
     );
 
-    const resp = { access };
-    if (debug) {
-      resp.debug = {
-        subs: subs.data.map(s => ({
-          id: s.id,
-          status: s.status,
-          prices: s.items.data.map(i => i.price.id)
-        })),
-        validPriceIds: VALID_PRICE_IDS
-      };
-    }
-    return res.status(200).json(resp);
+    return res.status(200).json({ access: hasValidSubscription });
   } catch (err) {
-    console.error("check-subscription error:", err && (err.stack || err.message || err));
-    // Never throw a 500 to the browser
+    console.error("Stripe error:", err && (err.stack || err.message || err));
+    // Never surface a 500 to the client
     return res.status(200).json({ access: false, error: "server_error" });
   }
 };
