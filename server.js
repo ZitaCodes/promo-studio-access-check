@@ -1,118 +1,81 @@
-// server.js with MongoDB integration for pull tracking
+// server.js — promo-studio-access-check (Render)
 const express = require("express");
 const cors = require("cors");
-const bodyParser = require("body-parser");
-// const mongoose = require("mongoose");
 const Stripe = require("stripe");
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
-console.log("🧪 Stripe Key Render Sees:", process.env.STRIPE_SECRET_KEY);
 
 const app = express();
 
-// ✅ MongoDB Setup
-// const mongoURI = process.env.MONGODB_URI;
-//mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
-//  .then(() => console.log("✅ MongoDB connected"))
-//  .catch(err => console.error("❌ MongoDB connection error:", err));
-
-//const pullSchema = new mongoose.Schema({
-//  email: { type: String, required: true, unique: true },
-//  pulls_used: { type: Number, default: 0 },
-//  pull_limit: { type: Number, default: 26 },
-//  last_reset: { type: Date, default: new Date() }
-//});
-
-//const Pull = mongoose.model("Pull", pullSchema);
-
-// ✅ CORS config to allow Vercel domain
-const allowedOrigins = ["https://bookmkttool.vercel.app"];
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error("CORS not allowed from this origin"), false);
+// --- CORS: allow your front-ends ---
+const corsOptions = {
+  origin(origin, cb) {
+    if (!origin) return cb(null, true); // server-to-server / curl
+    try {
+      const { hostname } = new URL(origin);
+      const allowed =
+        hostname.endsWith(".vercel.app") ||
+        hostname === "cloutbooks.com" ||
+        hostname === "www.cloutbooks.com" ||
+        hostname === "localhost"; // keep for local dev if you want
+      return cb(allowed ? null : new Error("CORS not allowed"), allowed);
+    } catch {
+      return cb(new Error("CORS origin parse error"), false);
+    }
   },
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type"]
-}));
+  methods: ["POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type"],
+  optionsSuccessStatus: 204,
+  maxAge: 86400
+};
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));            // ✅ every preflight gets 204
 
-app.use(bodyParser.json());
+// If you have any redirect middleware (force-https, etc.), guard OPTIONS:
+// app.use((req,res,next)=> req.method==="OPTIONS" ? res.sendStatus(204) : next());
 
-// ✅ Check + reset logic
-async function checkAndReset(email) {
-  const today = new Date();
-  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  let record = await Pull.findOne({ email });
+app.use(express.json());
 
-  if (!record) {
-    record = new Pull({ email });
-  } else if (record.last_reset < firstOfMonth) {
-    record.pulls_used = 0;
-    record.last_reset = today;
-  }
+// --- Stripe ---
+const STRIPE_KEY = process.env.STRIPE_SECRET_KEY || "";
+const stripe = STRIPE_KEY.startsWith("sk_") ? new Stripe(STRIPE_KEY) : null;
 
-  await record.save();
-  return record;
-}
+// Add ALL price IDs that should grant access
+const VALID_PRICE_IDS = [
+  "price_1RCWrsKcBIwVNUGjVanTTXxl",
+  // "price_... (add other tiers if you sell them)"
+];
 
-// ✅ GET pull status
-app.get("/api/pulls", async (req, res) => {
-  const email = req.query.email;
-  if (!email) return res.status(400).json({ error: "Missing email" });
+// Allow statuses you consider valid
+const OK = new Set(["active", "trialing"]); // add "past_due","incomplete" if you want grace
 
-  try {
-    const record = await checkAndReset(email);
-    res.json({ pulls_used: record.pulls_used, pull_limit: record.pull_limit });
-  } catch (err) {
-    console.error("❌ Error in /api/pulls GET:", err);
-    res.status(500).json({ error: "Failed to fetch pull data" });
-  }
-});
-
-// ✅ POST increment pull
-app.post("/api/pulls", async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ error: "Missing email" });
-
-  try {
-    const record = await checkAndReset(email);
-    record.pulls_used = Math.min(record.pulls_used + 1, record.pull_limit);
-    await record.save();
-    res.json({ pulls_used: record.pulls_used, pull_limit: record.pull_limit });
-  } catch (err) {
-    console.error("❌ Error in /api/pulls POST:", err);
-    res.status(500).json({ error: "Failed to update pull count" });
-  }
-});
-
-// ✅ Stripe Subscription Check
-const VALID_PRICE_IDS = ["price_1RCWrsKcBIwVNUGjVanTTXxl"];
 app.post("/api/check-subscription", async (req, res) => {
-  const { email } = req.body;
   try {
-    const customers = await stripe.customers.list({ email });
-    const customer = customers.data[0];
-    if (!customer) return res.json({ access: false });
+    if (!stripe) return res.status(200).json({ access:false, error:"stripe_key_missing" });
 
-    const stripeSubs = await stripe.subscriptions.list({
-      customer: customer.id,
+    const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+    const email = (body.email || "").trim().toLowerCase();
+    if (!email) return res.status(200).json({ access:false, error:"email_required" });
+
+    const { data: customers } = await stripe.customers.list({ email, limit: 1 });
+    if (!customers?.length) return res.status(200).json({ access:false });
+
+    const subs = await stripe.subscriptions.list({
+      customer: customers[0].id,
       status: "all",
-      expand: ["data.items", "data.items.data.price"]
+      expand: ["data.items.data.price.product"],
+      limit: 100
     });
 
-    const hasMatch = stripeSubs.data.some(sub =>
-      sub.status === "active" &&
-      sub.items.data.some(item => VALID_PRICE_IDS.includes(item.price.id))
+    const access = subs.data.some(
+      s => OK.has(s.status) && s.items.data.some(i => VALID_PRICE_IDS.includes(i.price.id))
     );
 
-    res.json({ access: hasMatch });
-  } catch (err) {
-    console.error("❌ Stripe Error:", err.message);
-    res.status(500).json({ access: false });
+    return res.status(200).json({ access });
+  } catch (e) {
+    console.error("check-subscription error:", e?.message || e);
+    // never 500 the browser
+    return res.status(200).json({ access:false, error:"server_error" });
   }
 });
 
-app.listen(10000, () => {
-  console.log("✅ Server with MongoDB and Stripe is live on port 10000 🎉");
-});
-
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log("Access check server listening on", PORT));
